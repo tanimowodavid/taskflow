@@ -51,3 +51,43 @@ class Membership(models.Model):
     def __str__(self):
         return f"{self.user} → {self.organization} ({self.role})"
 
+
+import uuid
+from django.conf import settings
+from django.db import models
+from django.utils import timezone
+from datetime import timedelta
+
+User = settings.AUTH_USER_MODEL
+
+
+class OrganizationInvite(models.Model):
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="invites"
+    )
+    email = models.EmailField()
+    role = models.CharField(
+        max_length=20,
+        choices=Membership.ROLE_CHOICES,
+        default=Membership.ROLE_MEMBER
+    )
+    token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    invited_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="sent_invites"
+    )
+    is_accepted = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    def save(self, *args, **kwargs):
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timedelta(days=7)
+        super().save(*args, **kwargs)
+
+    def is_expired(self):
+        return timezone.now() > self.expires_at

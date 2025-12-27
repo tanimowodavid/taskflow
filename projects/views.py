@@ -3,6 +3,7 @@ from .models import Project
 from .serializers import ProjectSerializer
 from organizations.models import Membership
 from organizations.permissions import IsOrgAdminOrOwner
+from activity.utils import log_activity
 
 
 class ProjectListCreateView(generics.ListCreateAPIView):
@@ -18,3 +19,14 @@ class ProjectListCreateView(generics.ListCreateAPIView):
         if self.request.method == "POST":
             return [permissions.IsAuthenticated(), IsOrgAdminOrOwner()]
         return super().get_permissions()
+
+
+# Log project creation
+
+def perform_create(self, serializer):
+    project = serializer.save()
+    log_activity(
+        organization=project.organization,
+        actor=self.request.user,
+        action=f"Created project '{project.name}'"
+    )

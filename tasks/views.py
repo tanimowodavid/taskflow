@@ -3,6 +3,7 @@ from .models import Task
 from .serializers import TaskSerializer
 from .permissions import IsTaskActor
 from organizations.models import Membership
+from activity.utils import log_activity
 
 
 class TaskListCreateView(generics.ListCreateAPIView):
@@ -24,6 +25,12 @@ class TaskListCreateView(generics.ListCreateAPIView):
             raise permissions.PermissionDenied("Not allowed to create tasks")
 
         serializer.save()
+        # Log task creation & updates
+        log_activity(
+            organization=serializer.validated_data["project"].organization,
+            actor=self.request.user,
+            action=f"Created task '{serializer.validated_data['title']}'"
+        )
 
 
 class TaskDetailView(generics.RetrieveUpdateAPIView):
@@ -33,4 +40,16 @@ class TaskDetailView(generics.RetrieveUpdateAPIView):
     def get_queryset(self):
         return Task.objects.filter(
             project__organization__memberships__user=self.request.user
+        ).distinct()
+    
+    def perform_update(self, serializer):
+        task = serializer.save()
+        log_activity(
+            organization=task.project.organization,
+            actor=self.request.user,
+            action=f"Updated task '{task.title}'"
         )
+
+
+
+
